@@ -186,34 +186,33 @@ const openTip = async () => {
   setTipLoading(true)
   setTipError(null)
   setTipText('')
-
   try {
-    const { data: s } = await supabase.auth.getSession()
-    const token = s.session?.access_token || null
-    const profile = s.session?.user?.user_metadata || null
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token || null
 
     const res = await fetch('/api/smart-tip', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
       body: JSON.stringify({
-        day: selectedDay,
-        profile, 
-      }),
+        day: selectedDay
+      })
     })
 
-    const json = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(json.error || 'Failed to fetch tip')
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('Please log in to get a personalized tip.')
+      throw new Error(`Request failed (${res.status})`)
+    }
 
-    const tip = (json && (json.tip as string)) || ''
+    const { tip } = await res.json()
     setTipText(tip || 'No tip available yet.')
-  } catch (err: any) {
-    setTipError(null)
-    setTipText(
-      'Based on recent entries, try one small improvement today: get 10–15 minutes of outdoor daylight before noon and aim for a consistent bedtime. You’ll see personalized tips here once your backend is connected.'
-    )
+  } catch (e: any) {
+    setTipError(e?.message || 'Something went wrong.')
+    if (!tipText) {
+      setTipText('Based on recent entries, try 10–15 minutes of outdoor daylight before noon and a consistent bedtime.')
+    }
   } finally {
     setTipLoading(false)
   }
