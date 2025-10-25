@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: #FE0B0B;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-x: none;
+}
+
+/* Make all replaced elements scale within the viewport */
+img, svg, canvas, video, iframe {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Prevent layout from growing due to min-content width */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Inputs/textareas shouldn’t force width overflow */
+input, textarea, select, button {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Long unbroken text (like Snellen letters) should wrap instead of widening the page */
+.tracking-widest { 
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
