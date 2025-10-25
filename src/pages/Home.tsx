@@ -181,27 +181,43 @@ export default function Home() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }
 
-  const openTip = async () => {
-    setTipOpen(true)
-    setTipLoading(true)
+const openTip = async () => {
+  setTipOpen(true)
+  setTipLoading(true)
+  setTipError(null)
+  setTipText('')
+
+  try {
+    const { data: s } = await supabase.auth.getSession()
+    const token = s.session?.access_token || null
+    const profile = s.session?.user?.user_metadata || null
+
+    const res = await fetch('/api/smart-tip', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        day: selectedDay,
+        profile, 
+      }),
+    })
+
+    const json = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(json.error || 'Failed to fetch tip')
+
+    const tip = (json && (json.tip as string)) || ''
+    setTipText(tip || 'No tip available yet.')
+  } catch (err: any) {
     setTipError(null)
-    setTipText('')
-    try {
-      const res = await fetch('/api/smart-tip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day: selectedDay })
-      })
-      if (!res.ok) throw new Error('Failed to fetch tip')
-      const json = await res.json()
-      const tip = (json && (json.tip as string)) || ''
-      setTipText(tip || 'No tip available yet.')
-    } catch {
-      setTipText('Based on recent entries, try one small improvement today: get 10–15 minutes of outdoor daylight before noon and aim for a consistent bedtime. You’ll see personalized tips here once your backend is connected.')
-    } finally {
-      setTipLoading(false)
-    }
+    setTipText(
+      'Based on recent entries, try one small improvement today: get 10–15 minutes of outdoor daylight before noon and aim for a consistent bedtime. You’ll see personalized tips here once your backend is connected.'
+    )
+  } finally {
+    setTipLoading(false)
   }
+}
 
   const visionScore = scores['Vision Wellness']
   const centerDynamic =
