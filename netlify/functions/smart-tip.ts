@@ -1,120 +1,116 @@
 import type { Handler } from '@netlify/functions'
+import OpenAI from 'openai'
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = process.env.SUPABASE_URL as string
-const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE as string
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY as string
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! })
 
-const json = (statusCode: number, body: any) => ({
-  statusCode,
-  headers: { 'content-type': 'application/json' },
-  body: JSON.stringify(body),
-})
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE!,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+)
+
+function json(status: number, body: any) {
+  return {
+    statusCode: status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+    body: JSON.stringify(body),
+  }
+}
 
 export const handler: Handler = async (event) => {
   try {
-    if (event.httpMethod !== 'POST') {
-      return json(405, { error: 'Method Not Allowed' })
-    }
-
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
-      return json(500, { error: 'Server not configured: Supabase env missing' })
-    }
+    if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' })
 
     const auth = event.headers.authorization || ''
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
-    if (!token) return json(401, { error: 'Unauthorized' })
+    if (!token) return json(401, { error: 'Missing Authorization Bearer token' })
 
-    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } })
+    const parsed = (() => { try { return JSON.parse(event.body || '{}') } catch { return {} } })()
+    const day = typeof parsed.day === 'string' ? parsed.day : null
 
-    const { data: userResp, error: userErr } = await admin.auth.getUser(token)
-    if (userErr || !userResp?.user) return json(401, { error: 'Invalid token' })
-    const user = userResp.user
-    const uid = user.id
-
-    const since = new Date()
-    since.setDate(since.getDate() - 30)
-    const sinceISO = since.toISOString().slice(0, 10)
-
-    const { data: scores, error: scoresErr } = await admin
-      .from('wellness_scores')
-      .select('day, topic, score, raw_points, max_points')
-      .eq('user_id', uid)
-      .gte('day', sinceISO)
-      .order('day', { ascending: false })
-      .limit(500)
-
-    if (scoresErr) return json(500, { error: 'Failed to load scores' })
+    const { data: userRes, error: userErr } = await supabaseAdmin.auth.getUser(token)
+    if (userErr || !userRes?.user) return json(401, { error: 'Invalid token' })
+    const user = userRes.user
 
     const profile = {
-      name: user.user_metadata?.name ?? null,
-      gender: user.user_metadata?.gender ?? null,
-      age: user.user_metadata?.age ?? null,
-      height_cm: user.user_metadata?.height_cm ?? null,
-      weight_kg: user.user_metadata?.weight_kg ?? null,
-      medications: user.user_metadata?.medications ?? null,
+      id: user.id,
       email: user.email ?? null,
+      name: (user.user_metadata as any)?.name ?? null,
+      gender: (user.user_metadata as any)?.gender ?? null,
+      age: (user.user_metadata as any)?.age ?? null,
+      height_cm: (user.user_metadata as any)?.height_cm ?? null,
+      weight_kg: (user.user_metadata as any)?.weight_kg ?? null,
+      medications: (user.user_metadata as any)?.medications ?? null,
     }
 
-    let tipText =
-      'Based on recent entries, try 10–15 minutes of outdoor daylight before noon and a consistent bedtime. Personalized tips will appear once the backend is connected.'
+    const { data: scores, error: sErr } = await supabaseAdmin
+      .from('wellness_scores')
+      .select('day, topic, score, raw_points, max_points')
+      .eq('user_id', user.id)
+      .order('day', { ascending: true })
 
-    if (OPENAI_API_KEY) {
-      const messages = [
-        {
-          role: 'system',
-          content:
-            'You are a concise health coach. Use the provided profile and scores to output one actionable tip (2–4 sentences). Prioritize the biggest opportunity. Avoid medical diagnoses.',
-        },
-        {
-          role: 'user',
-          content: JSON.stringify(
-            {
-              profile,
-              scores: (scores ?? []).map((s) => ({
-                day: s.day,
-                topic: s.topic,
-                score: s.score,
-                raw_points: s.raw_points,
-                max_points: s.max_points,
-              })),
-            },
-            null,
-            0
-          ),
-        },
-      ]
+    if (sErr) return json(500, { error: sErr.message })
 
-      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          temperature: 0.6,
-          max_tokens: 220,
-          messages,
-        }),
-      })
+    const topics: Record<string, { sum: number; cnt: number }> = {}
+    for (const r of scores ?? []) {
+      const t = String((r as any).topic)
+      const v = Number((r as any).score)
+      if (!isFinite(v)) continue
+      if (!topics[t]) topics[t] = { sum: 0, cnt: 0 }
+      topics[t].sum += v
+      topics[t].cnt += 1
+    }
+    const averages = Object.fromEntries(
+      Object.entries(topics).map(([k, v]) => [k, v.cnt ? v.sum / v.cnt : 0])
+    )
 
-      if (resp.ok) {
-        const data = (await resp.json()) as any
-        const content = data?.choices?.[0]?.message?.content?.trim()
-        if (content) tipText = content
-      }
+    const payloadForModel = {
+      day,
+      profile,
+      scores_all_days: (scores ?? []).map((r: any) => ({
+        day: r.day,
+        topic: r.topic,
+        score: r.score,
+        raw_points: r.raw_points,
+        max_points: r.max_points,
+      })),
+      averages_by_topic: averages,
     }
 
-    return json(200, {
-      tip: tipText,
-      used: {
-        user_id: uid,
-        score_count: scores?.length ?? 0,
-        since: sinceISO,
+    const tipPrompt = [
+      {
+        role: 'system',
+        content:
+            'You are a concise health coach for SightSage Foods and Nutrition. Use the provided profile and scores to output one actionable tip (2–4 sentences). Prioritize the biggest opportunity. Avoid medical diagnoses. Also make sure you recommend a SightSage product and give the link to the user to make a purchase',      },
+      {
+        role: 'user',
+        content:
+          'Here is my profile and all wellness scores (all days). Please give me one personalized tip for today.\n' +
+          JSON.stringify(payloadForModel),
       },
-    })
+    ]
+
+    let tip = ''
+    try {
+      const resp = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: tipPrompt as any,
+        temperature: 0.7,
+        max_tokens: 220,
+      })
+      tip = resp.choices?.[0]?.message?.content?.trim() || ''
+    } catch {
+      tip = ''
+    }
+
+    if (!tip) {
+      tip =
+        'Try 10–15 minutes of outdoor daylight before noon and a consistent bedtime tonight. Keep screen brightness lower in the evening to support better sleep and eye comfort.'
+    }
+
+    return json(200, { tip })
   } catch (e: any) {
-    return json(500, { error: 'Unexpected error', detail: e?.message || String(e) })
+    return json(500, { error: e?.message || 'Server error' })
   }
 }
