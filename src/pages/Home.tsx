@@ -31,6 +31,14 @@ const SLICE_COLORS = [
   '#F28B33',
 ]
 
+const PRODUCT_LINKS: Record<string, string> = {
+  sightc: 'https://sightsage.com/collections/bestsellers/products/sightc-natural-dry-eye-supplement',
+  blueberry: 'https://sightsage.com/products/blueberry-gummy',
+  adaptogen: 'https://sightsage.com/products/adaptogen-x',
+  superfood: 'https://sightsage.com/products/superfoods-wellness-tea',
+  default: 'https://sightsage.com/collections/bestsellers',
+}
+
 const degToRad = (d: number) => (Math.PI / 180) * d
 const polarToCartesian = (cx: number, cy: number, r: number, angleDeg: number) => {
   const a = degToRad(angleDeg)
@@ -209,8 +217,18 @@ export default function Home() {
         body: JSON.stringify({ day: selectedDay })
       })
       if (!res.ok) throw new Error('Failed to fetch tip')
-      const json = await res.json()
-      const tip = (json && (json.tip as string)) || ''
+      let tip = ((await res.json())?.tip as string) || ''
+      const hasUrl = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|https?:\/\/\S+/i.test(tip)
+      if (!hasUrl) {
+        const t = tip.toLowerCase()
+        const link =
+          t.includes('sightc') ? PRODUCT_LINKS.sightc :
+          t.includes('blueberry') ? PRODUCT_LINKS.blueberry :
+          t.includes('adaptogen') ? PRODUCT_LINKS.adaptogen :
+          t.includes('superfood') || t.includes('wellness blend') ? PRODUCT_LINKS.superfood :
+          PRODUCT_LINKS.default
+        tip = `${tip.trim()} Click <a href="${link}" target="_blank" rel="noopener noreferrer" class="underline text-[var(--brand)] font-semibold">here</a>.`
+      }
       setTipText(tip || 'No tip available yet.')
     } catch {
       setTipText('Based on recent entries, try one small improvement today: get 10–15 minutes of outdoor daylight before noon and aim for a consistent bedtime. You’ll see personalized tips here once your backend is connected.')
