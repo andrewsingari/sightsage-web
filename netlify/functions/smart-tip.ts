@@ -1,28 +1,42 @@
-import OpenAI from "openai"
+import type { Handler } from '@netlify/functions';
 
-export const handler = async (event: any) => {
-  if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" }
+export const handler: Handler = async (event) => {
   try {
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) return { statusCode: 500, body: "Missing OPENAI_API_KEY" }
+    if (event.httpMethod !== 'POST') {
+      return {
+        statusCode: 405,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ error: 'Method not allowed' }),
+      };
+    }
 
-    const client = new OpenAI({ apiKey })
-    const { profile, scores } = JSON.parse(event.body || "{}")
-    const messages = [
-      { role: "system", content: "You are a helpful health assistant. Keep advice general and non-medical." },
-      { role: "user", content: `Based on this data, give one concise, encouraging wellness tip.\nProfile: ${JSON.stringify(profile)}\nScores: ${JSON.stringify(scores)}` }
-    ]
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    const payload = JSON.parse(event.body || '{}');
+    const { profile, scores, day } = payload;
 
-    const resp = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages,
-      temperature: 0.7,
-      max_tokens: 160
-    })
+    if (!OPENAI_API_KEY) {
+      return {
+        statusCode: 500,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ error: 'Missing OPENAI_API_KEY' }),
+      };
+    }
 
-    const tip = resp.choices?.[0]?.message?.content?.trim() || "No tip available."
-    return { statusCode: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ tip }) }
+    // Minimal placeholder: return a canned tip for now.
+    // Later you’ll call OpenAI here using `fetch` with your key.
+    const tip =
+      'Based on your recent entries, try 10–15 minutes of outdoor daylight before noon and a consistent bedtime. Personalized tips will appear once the backend is connected.';
+
+    return {
+      statusCode: 200,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ tip }),
+    };
   } catch (err: any) {
-    return { statusCode: 500, body: JSON.stringify({ error: String(err) }) }
+    return {
+      statusCode: 500,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ error: err?.message || 'Unknown error' }),
+    };
   }
-}
+};
