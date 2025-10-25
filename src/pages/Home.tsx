@@ -64,6 +64,18 @@ const formatHuman = (iso: string) => {
   return local.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
 }
 
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+}
+function mdToHtml(md: string) {
+  let html = escapeHtml(md)
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+  html = html.replace(/(^|[^"'=\]])(https?:\/\/[^\s<]+)/g, (_m, p1, url) => `${p1}<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`)
+  html = html.replace(/\n{2,}/g, '<br/><br/>').replace(/\n/g, '<br/>')
+  return html
+}
+
 export default function Home() {
   const nav = useNavigate()
   const location = useLocation()
@@ -181,32 +193,32 @@ export default function Home() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
   }
 
-const openTip = async () => {
-  setTipOpen(true)
-  setTipLoading(true)
-  setTipError(null)
-  setTipText('')
-  try {
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token || null
-    const res = await fetch('/api/smart-tip', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: JSON.stringify({ day: selectedDay })
-    })
-    if (!res.ok) throw new Error('Failed to fetch tip')
-    const json = await res.json()
-    const tip = (json && (json.tip as string)) || ''
-    setTipText(tip || 'No tip available yet.')
-  } catch {
-    setTipText('Based on recent entries, try one small improvement today: get 10–15 minutes of outdoor daylight before noon and aim for a consistent bedtime. You’ll see personalized tips here once your backend is connected.')
-  } finally {
-    setTipLoading(false)
+  const openTip = async () => {
+    setTipOpen(true)
+    setTipLoading(true)
+    setTipError(null)
+    setTipText('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token || null
+      const res = await fetch('/api/smart-tip', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ day: selectedDay })
+      })
+      if (!res.ok) throw new Error('Failed to fetch tip')
+      const json = await res.json()
+      const tip = (json && (json.tip as string)) || ''
+      setTipText(tip || 'No tip available yet.')
+    } catch {
+      setTipText('Based on recent entries, try one small improvement today: get 10–15 minutes of outdoor daylight before noon and aim for a consistent bedtime. You’ll see personalized tips here once your backend is connected.')
+    } finally {
+      setTipLoading(false)
+    }
   }
-}
 
   const visionScore = scores['Vision Wellness']
   const centerDynamic =
@@ -549,7 +561,7 @@ const openTip = async () => {
           <div className="bg-white w-[min(92vw,560px)] rounded-2xl p-5 sm:p-6 shadow-xl">
             <div className="text-lg sm:text-xl font-bold mb-2">Smart Tip</div>
             <div className="min-h-[80px] text-gray-800">
-              {tipLoading ? 'Fetching your tip…' : tipError ? <span className="text-red-600">{tipError}</span> : tipText}
+              {tipLoading ? 'Fetching your tip…' : tipError ? <span className="text-red-600">{tipError}</span> : <div dangerouslySetInnerHTML={{ __html: mdToHtml(tipText) }} />}
             </div>
             <div className="mt-4 flex items-center justify-end gap-2">
               <button
