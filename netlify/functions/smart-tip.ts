@@ -108,6 +108,7 @@ Take between 1-6 gummies a day depending on your eye health condition. Take 1 gu
 Link: https://sightsage.com/products/blueberry-gummy
 
 AdaptogenX: Reduce your cortisol levels, fight alopecia, and combat hair loss with Adaptogen-X! 🌿✨ This daily supplement is made in Canada to get rid of hair loss and premature grey/white hairs by treating hormonal imbalances. Optimal for people dealing with a range of issues such as PCOS, thyroid issues, perimenopause, etc. Packed with a powerful blend of all-natural ingredients.
+It is great for people with insomnia. 
 Specifications:
 * Quantity: 60 capsules per bottle
 Key Ingredients:
