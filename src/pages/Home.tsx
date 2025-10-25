@@ -64,18 +64,6 @@ const formatHuman = (iso: string) => {
   return local.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
 }
 
-function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
-}
-function mdToHtml(md: string) {
-  let html = escapeHtml(md)
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-  html = html.replace(/(^|[^"'=\]])(https?:\/\/[^\s<]+)/g, (_m, p1, url) => `${p1}<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`)
-  html = html.replace(/\n{2,}/g, '<br/><br/>').replace(/\n/g, '<br/>')
-  return html
-}
-
 export default function Home() {
   const nav = useNavigate()
   const location = useLocation()
@@ -92,6 +80,17 @@ export default function Home() {
   const [tipLoading, setTipLoading] = useState(false)
   const [tipText, setTipText] = useState('')
   const [tipError, setTipError] = useState<string | null>(null)
+
+  const linkify = (s: string) => {
+    let html = s || ''
+    html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="underline text-[var(--brand)] font-semibold">$1</a>')
+    html = html.replace(/(^|[\s(])((https?:\/\/|www\.)[^\s<)]+)/gi, (_m, p1, p2) => {
+      const url = p2.startsWith('http') ? p2 : `https://${p2}`
+      return `${p1}<a href="${url}" target="_blank" rel="noopener noreferrer" class="underline text-[var(--brand)] font-semibold">${p2}</a>`
+    })
+    html = html.replace(/\n/g, '<br/>')
+    return html
+  }
 
   useEffect(() => {
     try { window.history.scrollRestoration = 'manual' } catch {}
@@ -238,6 +237,8 @@ export default function Home() {
       if (hasData) nav(`/healthreport#${anchor}`)
     }
   }
+
+  const tipHtml = linkify(tipText)
 
   return (
     <div className="overflow-x-hidden">
@@ -561,7 +562,7 @@ export default function Home() {
           <div className="bg-white w-[min(92vw,560px)] rounded-2xl p-5 sm:p-6 shadow-xl">
             <div className="text-lg sm:text-xl font-bold mb-2">Smart Tip</div>
             <div className="min-h-[80px] text-gray-800">
-              {tipLoading ? 'Fetching your tip…' : tipError ? <span className="text-red-600">{tipError}</span> : <div dangerouslySetInnerHTML={{ __html: mdToHtml(tipText) }} />}
+              {tipLoading ? 'Fetching your tip…' : tipError ? <span className="text-red-600">{tipError}</span> : <span dangerouslySetInnerHTML={{ __html: tipHtml }} />}
             </div>
             <div className="mt-4 flex items-center justify-end gap-2">
               <button
