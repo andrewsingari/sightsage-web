@@ -1,32 +1,36 @@
 import type { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 
-const json = (status: number, body: unknown) => ({
-  statusCode: status,
-  headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+const SUPABASE_URL = process.env.SUPABASE_URL as string
+const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE as string
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY as string
+
+const json = (statusCode: number, body: any) => ({
+  statusCode,
+  headers: { 'content-type': 'application/json' },
   body: JSON.stringify(body),
 })
 
 export const handler: Handler = async (event) => {
   try {
-    if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' })
+    if (event.httpMethod !== 'POST') {
+      return json(405, { error: 'Method Not Allowed' })
+    }
 
-    const supabaseUrl = process.env.SUPABASE_URL
-    const serviceRole = process.env.SUPABASE_SERVICE_ROLE
-    const openaiKey = process.env.OPENAI_API_KEY
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
+      return json(500, { error: 'Server not configured: Supabase env missing' })
+    }
 
-    if (!supabaseUrl || !serviceRole) return json(500, { error: 'Server not configured' })
+    const auth = event.headers.authorization || ''
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+    if (!token) return json(401, { error: 'Unauthorized' })
 
-    const auth = event.headers.authorization || event.headers.Authorization
-    if (!auth || !auth.startsWith('Bearer ')) return json(401, { error: 'Missing auth' })
-    const jwt = auth.slice('Bearer '.length).trim()
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE, { auth: { persistSession: false } })
 
-    const admin = createClient(supabaseUrl, serviceRole)
-
-    const { data: userData, error: userErr } = await admin.auth.getUser(jwt)
-    if (userErr || !userData?.user) return json(401, { error: 'Invalid user' })
-    const user = userData.user
-    const meta = (user.user_metadata || {}) as Record<string, any>
+    const { data: userResp, error: userErr } = await admin.auth.getUser(token)
+    if (userErr || !userResp?.user) return json(401, { error: 'Invalid token' })
+    const user = userResp.user
+    const uid = user.id
 
     const since = new Date()
     since.setDate(since.getDate() - 30)
@@ -34,74 +38,83 @@ export const handler: Handler = async (event) => {
 
     const { data: scores, error: scoresErr } = await admin
       .from('wellness_scores')
-      .select('day,topic,score,raw_points,max_points')
-      .eq('user_id', user.id)
+      .select('day, topic, score, raw_points, max_points')
+      .eq('user_id', uid)
       .gte('day', sinceISO)
-      .order('day', { ascending: true })
+      .order('day', { ascending: false })
+      .limit(500)
 
     if (scoresErr) return json(500, { error: 'Failed to load scores' })
 
-    const byTopic = new Map<
-      string,
-      { sum: number; count: number; latest: { day: string; score: number; raw_points: number | null; max_points: number | null } }
-    >()
-    for (const r of scores || []) {
-      const s = Number((r as any).score)
-      const topic = String((r as any).topic)
-      const raw = (r as any).raw_points == null ? null : Number((r as any).raw_points)
-      const max = (r as any).max_points == null ? null : Number((r as any).max_points)
-      const cur = byTopic.get(topic) || { sum: 0, count: 0, latest: { day: String(r.day), score: s, raw_points: raw, max_points: max } }
-      cur.sum += s
-      cur.count += 1
-      if (String(r.day) >= cur.latest.day) cur.latest = { day: String(r.day), score: s, raw_points: raw, max_points: max }
-      byTopic.set(topic, cur)
-    }
-    const summary = Array.from(byTopic.entries()).map(([topic, v]) => ({
-      topic,
-      avg: v.count ? v.sum / v.count : null,
-      latest: v.latest,
-    }))
-
     const profile = {
-      name: meta.name ?? null,
-      gender: meta.gender ?? null,
-      age: meta.age ?? null,
-      height_cm: meta.height_cm ?? null,
-      weight_kg: meta.weight_kg ?? null,
-      medications: meta.medications ?? null,
+      name: user.user_metadata?.name ?? null,
+      gender: user.user_metadata?.gender ?? null,
+      age: user.user_metadata?.age ?? null,
+      height_cm: user.user_metadata?.height_cm ?? null,
+      weight_kg: user.user_metadata?.weight_kg ?? null,
+      medications: user.user_metadata?.medications ?? null,
+      email: user.email ?? null,
     }
 
-    let tip =
-      'Based on your recent entries, try 10–15 minutes of outdoor daylight before noon and a consistent bedtime. Personalized tips will appear once the backend is connected.'
+    let tipText =
+      'Based on recent entries, try 10–15 minutes of outdoor daylight before noon and a consistent bedtime. Personalized tips will appear once the backend is connected.'
 
-    if (openaiKey) {
-      const userBlob = { profile, summary }
-      const sys =
-        'You are a concise wellness coach. Provide one actionable, safe, evidence-informed tip personalized to the user data. 2–3 sentences. Avoid medical claims. If data is sparse, give a generally helpful habit.'
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    if (OPENAI_API_KEY) {
+      const messages = [
+        {
+          role: 'system',
+          content:
+            'You are a concise health coach. Use the provided profile and scores to output one actionable tip (2–4 sentences). Prioritize the biggest opportunity. Avoid medical diagnoses.',
+        },
+        {
+          role: 'user',
+          content: JSON.stringify(
+            {
+              profile,
+              scores: (scores ?? []).map((s) => ({
+                day: s.day,
+                topic: s.topic,
+                score: s.score,
+                raw_points: s.raw_points,
+                max_points: s.max_points,
+              })),
+            },
+            null,
+            0
+          ),
+        },
+      ]
+
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${openaiKey}` },
+        headers: {
+          'content-type': 'application/json',
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
         body: JSON.stringify({
           model: 'gpt-4o-mini',
-          temperature: 0.7,
-          max_tokens: 200,
-          messages: [
-            { role: 'system', content: sys },
-            { role: 'user', content: `User data (JSON): ${JSON.stringify(userBlob)}` },
-          ],
+          temperature: 0.6,
+          max_tokens: 220,
+          messages,
         }),
       })
-      if (res.ok) {
-        const j = await res.json()
-        tip = j?.choices?.[0]?.message?.content?.trim() || tip
+
+      if (resp.ok) {
+        const data = (await resp.json()) as any
+        const content = data?.choices?.[0]?.message?.content?.trim()
+        if (content) tipText = content
       }
     }
 
-    return json(200, { tip })
-  } catch (e: any) {
     return json(200, {
-      tip:
-        'Based on recent entries, try a short daylight walk today and keep your bedtime within a 30–45 minute window. Personalized tips will improve as more data is available.',
+      tip: tipText,
+      used: {
+        user_id: uid,
+        score_count: scores?.length ?? 0,
+        since: sinceISO,
+      },
     })
+  } catch (e: any) {
+    return json(500, { error: 'Unexpected error', detail: e?.message || String(e) })
   }
 }
