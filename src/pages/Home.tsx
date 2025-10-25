@@ -87,7 +87,10 @@ export default function Home() {
   const [tipOpen, setTipOpen] = useState(false)
   const [tipLoading, setTipLoading] = useState(false)
   const [tipText, setTipText] = useState('')
+  const [tipHtml, setTipHtml] = useState<string | null>(null)
   const [tipError, setTipError] = useState<string | null>(null)
+  const [ctaUrl, setCtaUrl] = useState<string | null>(null)
+  const [ctaLabel, setCtaLabel] = useState<string>('Shop SightSage')
 
   const linkify = (s: string) => {
     let html = s || ''
@@ -98,6 +101,21 @@ export default function Home() {
     })
     html = html.replace(/\n/g, '<br/>')
     return html
+  }
+
+  const extractFirstUrl = (s: string | null | undefined) => {
+    if (!s) return null
+    const m = s.match(/https?:\/\/[^\s)]+/i)
+    return m ? m[0] : null
+  }
+
+  const pickProduct = (t: string) => {
+    const s = (t || '').toLowerCase()
+    if (s.includes('sightc')) return { link: PRODUCT_LINKS.sightc, label: 'Buy SightC' }
+    if (s.includes('blueberry')) return { link: PRODUCT_LINKS.blueberry, label: 'Buy Blueberry Gummies' }
+    if (s.includes('adaptogen')) return { link: PRODUCT_LINKS.adaptogen, label: 'Buy AdaptogenX' }
+    if (s.includes('superfood') || s.includes('wellness blend')) return { link: PRODUCT_LINKS.superfood, label: 'Buy Superfood Wellness Blend' }
+    return { link: PRODUCT_LINKS.default, label: 'Shop SightSage' }
   }
 
   useEffect(() => {
@@ -205,6 +223,8 @@ export default function Home() {
     setTipLoading(true)
     setTipError(null)
     setTipText('')
+    setTipHtml(null)
+    setCtaUrl(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token || null
@@ -217,21 +237,36 @@ export default function Home() {
         body: JSON.stringify({ day: selectedDay })
       })
       if (!res.ok) throw new Error('Failed to fetch tip')
-      let tip = ((await res.json())?.tip as string) || ''
-      const hasUrl = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|https?:\/\/\S+/i.test(tip)
-      if (!hasUrl) {
-        const t = tip.toLowerCase()
-        const link =
-          t.includes('sightc') ? PRODUCT_LINKS.sightc :
-          t.includes('blueberry') ? PRODUCT_LINKS.blueberry :
-          t.includes('adaptogen') ? PRODUCT_LINKS.adaptogen :
-          t.includes('superfood') || t.includes('wellness blend') ? PRODUCT_LINKS.superfood :
-          PRODUCT_LINKS.default
-        tip = `${tip.trim()} Click <a href="${link}" target="_blank" rel="noopener noreferrer" class="underline text-[var(--brand)] font-semibold">here</a>.`
+      const json = await res.json().catch(() => ({}))
+      const html = typeof json?.html === 'string' ? json.html : null
+      const text = typeof json?.text === 'string' ? json.text : (typeof json?.tip === 'string' ? json.tip : '')
+      let outHtml: string
+      let url = extractFirstUrl(html || '') || extractFirstUrl(text)
+      if (html) {
+        outHtml = html
+      } else {
+        const hasUrl = !!url
+        if (!hasUrl) {
+          const pick = pickProduct(text)
+          url = pick.link
+          outHtml = `${linkify(text)} <a href="${url}" target="_blank" rel="noopener noreferrer" class="underline text-[var(--brand)] font-semibold">Click here</a>.`
+        } else {
+          outHtml = linkify(text)
+        }
       }
-      setTipText(tip || 'No tip available yet.')
+      setTipHtml(outHtml)
+      const pick = pickProduct(text + ' ' + (html || ''))
+      setCtaUrl(url || pick.link)
+      setCtaLabel(url && url.includes('blueberry') ? 'Buy Blueberry Gummies' :
+                  url && url.includes('adaptogen') ? 'Buy AdaptogenX' :
+                  url && url.includes('sightc') ? 'Buy SightC' :
+                  url && url.includes('superfood') ? 'Buy Superfood Wellness Blend' :
+                  pick.label)
     } catch {
       setTipText('Based on recent entries, try one small improvement today: get 10–15 minutes of outdoor daylight before noon and aim for a consistent bedtime. You’ll see personalized tips here once your backend is connected.')
+      setTipHtml(null)
+      setCtaUrl(PRODUCT_LINKS.default)
+      setCtaLabel('Shop SightSage')
     } finally {
       setTipLoading(false)
     }
@@ -256,7 +291,11 @@ export default function Home() {
     }
   }
 
-  const tipHtml = linkify(tipText)
+  const renderedTip = tipHtml ? (
+    <span dangerouslySetInnerHTML={{ __html: tipHtml }} />
+  ) : (
+    linkify(tipText)
+  )
 
   return (
     <div className="overflow-x-hidden">
@@ -580,9 +619,21 @@ export default function Home() {
           <div className="bg-white w-[min(92vw,560px)] rounded-2xl p-5 sm:p-6 shadow-xl">
             <div className="text-lg sm:text-xl font-bold mb-2">Smart Tip</div>
             <div className="min-h-[80px] text-gray-800">
-              {tipLoading ? 'Fetching your tip…' : tipError ? <span className="text-red-600">{tipError}</span> : <span dangerouslySetInnerHTML={{ __html: tipHtml }} />}
+              {tipLoading ? 'Fetching your tip…' : tipError ? <span className="text-red-600">{tipError}</span> : renderedTip}
             </div>
-            <div className="mt-4 flex items-center justify-end gap-2">
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <div>
+                {ctaUrl && (
+                  <a
+                    href={ctaUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-4 py-2 rounded-xl bg-[var(--brand)] text-white font-semibold hover:opacity-90"
+                  >
+                    {ctaLabel}
+                  </a>
+                )}
+              </div>
               <button
                 className="px-4 py-2 rounded-xl border bg-white hover:bg-gray-50 font-semibold"
                 onClick={() => setTipOpen(false)}
