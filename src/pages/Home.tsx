@@ -607,7 +607,7 @@ export default function Home() {
 
         <div className="w-full max-w-4xl px-4 sm:px-6 mt-5">
           <img
-            src="https://imgur.com/a/HOfGf3r"
+            src="/src/assets/bannerimage.png"
             alt="SightSage Banner"
             className="w-full h-48 sm:h-64 object-cover rounded-xl"
           />
