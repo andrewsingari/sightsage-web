@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import Header from '../components/Header'
 import { supabase } from '../lib/supabase'
-import bannerImage from '../src/assets/bannerimage.png';
+import bannerImage from '../assets/bannerimage.png';
 
 const SHOW_DEBUG = false
 
