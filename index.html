@@ -1,10 +1,17 @@
-
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SightSage Health Management </title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SightSage Health Management</title>
+    <script type="module">
+      import faviconUrl from '/src/public/favicon.png?url';
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/png';
+      link.href = faviconUrl;
+      document.head.appendChild(link);
+    </script>
   </head>
   <body class="bg-gray-50">
     <div id="root"></div>
