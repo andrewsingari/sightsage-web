@@ -263,7 +263,7 @@ export default function Home() {
                   url && url.includes('superfood') ? 'Buy Superfood Wellness Blend' :
                   pick.label)
     } catch {
-      setTipText('Based on recent entries, try one small improvement today: get 10–15 minutes of outdoor daylight before noon and aim for a consistent bedtime. You’ll see personalized tips here once your backend is connected.')
+      setTipText('Based on recent entries, try one small improvement today: get 10–15 minutes of outdoor daylight before noon and aim for a consistent bedtime. You’ll see personalized tips here once you register/login.')
       setTipHtml(null)
       setCtaUrl(PRODUCT_LINKS.default)
       setCtaLabel('Shop SightSage')
