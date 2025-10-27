@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import Header from '../components/Header'
 import { supabase } from '../lib/supabase'
+import bannerImage from '../src/assets/bannerimage.png';
 
 const SHOW_DEBUG = false
 
@@ -607,7 +608,7 @@ export default function Home() {
 
         <div className="w-full max-w-4xl px-4 sm:px-6 mt-5">
           <img
-            src="/src/assets/bannerimage.png"
+            src={bannerImage}
             alt="SightSage Banner"
             className="w-full h-48 sm:h-64 object-cover rounded-xl"
           />
