@@ -37,7 +37,7 @@ export const handler: Handler = async (event) => {
       channelId,
       type: 'video',
       order: 'date',
-      maxResults: '24',
+      maxResults: '10',
       q: query,
     })
 
