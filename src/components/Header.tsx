@@ -6,7 +6,7 @@ export default function Header() {
   const nav = useNavigate()
   const { pathname } = useLocation()
   const [authState, setAuthState] = useState<'loading' | 'in' | 'out'>('loading')
-  const [email, setEmail] = useState<string | null>(null)
+  const [user, setUser] = useState<any>(null)
   const [open, setOpen] = useState(false)
   const isProfile = pathname.startsWith('/profile')
 
@@ -16,21 +16,21 @@ export default function Header() {
       const { data: ures } = await supabase.auth.getUser()
       if (!alive) return
       if (ures.user) {
-        setEmail(ures.user.email ?? null)
+        setUser(ures.user)
         setAuthState('in')
       } else {
         const { data: sres } = await supabase.auth.getSession()
         if (!alive) return
-        const e = sres.session?.user?.email ?? null
-        setEmail(e)
-        setAuthState(e ? 'in' : 'out')
+        const u = sres.session?.user ?? null
+        setUser(u)
+        setAuthState(u ? 'in' : 'out')
       }
     }
     prime()
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
-      const e = session?.user?.email ?? null
-      setEmail(e)
-      setAuthState(e ? 'in' : 'out')
+      const u = session?.user ?? null
+      setUser(u)
+      setAuthState(u ? 'in' : 'out')
     })
     return () => {
       alive = false
@@ -40,7 +40,7 @@ export default function Header() {
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    setEmail(null)
+    setUser(null)
     setAuthState('out')
     setOpen(false)
     nav('/', { replace: true })
@@ -48,12 +48,41 @@ export default function Header() {
 
   const closeMenu = () => setOpen(false)
 
+  const logShareEvent = async (platform: string) => {
+    try {
+      if (user?.id) {
+        const displayName =
+          user.user_metadata?.name ||
+          user.user_metadata?.full_name ||
+          user.email?.split('@')[0] ||
+          null
+
+        await supabase.from('share_events').insert([
+          {
+            user_id: user.id,
+            email: user.email,
+            display_name: displayName,
+            platform,
+          },
+        ])
+      }
+    } catch (err) {
+      console.error('Failed to log share event', err)
+    }
+  }
+
   const share = async () => {
     const shareData = {
       title: 'SightSage',
       text: 'Check out SightSage Foods & Nutrition!',
       url: 'https://sightsage.com',
     }
+    const platform = /iPhone|iPad|Android/i.test(navigator.userAgent)
+      ? 'mobile'
+      : 'desktop'
+
+    await logShareEvent(platform)
+
     if (navigator.share) {
       try {
         await navigator.share(shareData)
