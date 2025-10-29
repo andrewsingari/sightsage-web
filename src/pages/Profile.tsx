@@ -152,6 +152,15 @@ export default function Profile() {
 
   return (
     <div className="max-w-xl mx-auto mt-4 px-6">
+      <div className="mb-2">
+        <button
+          type="button"
+          onClick={() => nav(-1)}
+          className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-gray-50"
+        >
+          ← Back
+        </button>
+      </div>
       <h1 className="text-3xl font-bold text-center text-[var(--brand)] mb-4">Profile</h1>
       <Card>
         <div className="grid gap-6">

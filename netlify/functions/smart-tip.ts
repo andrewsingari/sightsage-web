@@ -116,7 +116,7 @@ Rules:
     let tip = ''
     try {
       const resp = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: process.env.OPENAI_MODEL || 'gpt-5.1-instant',
         messages: tipPrompt as any,
         temperature: 0.6,
         max_tokens: 220,
