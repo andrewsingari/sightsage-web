@@ -108,9 +108,7 @@ export default function Education() {
 
       {searched && (
         <section>
-          <h2 className="text-lg md:text-2xl font-semibold text-gray-800 mb-4">
-            Search Results
-          </h2>
+          <h2 className="text-lg md:text-2xl font-semibold text-gray-800 mb-4">Search Results</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
             {results.map(v => (
               <a
