@@ -12,34 +12,54 @@ export default function Education() {
   const [results, setResults] = useState<SearchItem[]>([])
   const [nextToken, setNextToken] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const seenIdsRef = useRef<Set<string>>(new Set())
   const inFlightRef = useRef<AbortController | null>(null)
+  const flagsRef = useRef({ hasMore: false, loading: false, loadingMore: false, error: null as string | null, nextToken: null as string | null })
+  const lastRequestedTokenRef = useRef<string | null>(null)
 
   const heading = useMemo(() => (query.trim() ? 'Search Results' : 'Recent Uploads'), [query])
 
-  const fetchPage = useCallback(
-    async (opts: { reset?: boolean; after?: string | null } = {}) => {
-      if (inFlightRef.current) inFlightRef.current.abort()
-      const ac = new AbortController()
-      inFlightRef.current = ac
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const titleMatches = useCallback((title: string, q: string) => {
+    const t = (q || '').trim()
+    if (!t) return true
+    return new RegExp(`\\b${esc(t)}\\b`, 'i').test(title)
+  }, [])
 
+  const fetchPage = useCallback(
+    async (opts: { reset?: boolean; token?: string | null } = {}) => {
       const isReset = !!opts.reset
+      const token = opts.token ?? (isReset ? null : nextToken)
+
       if (isReset) {
+        if (inFlightRef.current) inFlightRef.current.abort()
+        inFlightRef.current = null
         setResults([])
         setNextToken(null)
         setHasMore(false)
+        setError(null)
         seenIdsRef.current.clear()
+        lastRequestedTokenRef.current = null
+      } else {
+        if (loadingMore) return
+        if (!token) return
+        if (lastRequestedTokenRef.current === token) return
+        lastRequestedTokenRef.current = token
       }
-      setError(null)
+
+      const ac = new AbortController()
+      if (isReset) inFlightRef.current = ac
+
       if (isReset) setLoading(true)
       else setLoadingMore(true)
+
       try {
-        const body: Record<string, any> = { topic, query, pageToken: opts.after ?? nextToken ?? null }
         const res = await fetch('/api/edu-search', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ topic, query, pageToken: token ?? null }),
           signal: ac.signal,
         })
         const data: ApiResp = await res.json().catch(() => ({} as any))
@@ -48,26 +68,32 @@ export default function Education() {
           setHasMore(false)
           return
         }
+
         const incoming = Array.isArray(data.items) ? data.items : []
-        const unique = incoming.filter(v => {
-          if (!v?.id) return false
+        const filtered = incoming.filter(v => v && v.id && titleMatches(v.title, query))
+        const unique = filtered.filter(v => {
           if (seenIdsRef.current.has(v.id)) return false
           seenIdsRef.current.add(v.id)
           return true
         })
+
         setResults(prev => (isReset ? unique : [...prev, ...unique]))
-        const token = data.nextPageToken || null
-        setNextToken(token)
-        setHasMore(!!token)
+        const newToken = data.nextPageToken || null
+        setNextToken(newToken)
+        setHasMore(!!newToken)
+        if (isReset) lastRequestedTokenRef.current = null
       } catch (e: any) {
         if (e?.name !== 'AbortError') setError('Unable to load results. Please try again.')
       } finally {
-        if (isReset) setLoading(false)
-        else setLoadingMore(false)
-        if (inFlightRef.current === ac) inFlightRef.current = null
+        if (isReset) {
+          setLoading(false)
+          if (inFlightRef.current === ac) inFlightRef.current = null
+        } else {
+          setLoadingMore(false)
+        }
       }
     },
-    [topic, query, nextToken]
+    [topic, query, nextToken, loadingMore, titleMatches]
   )
 
   const runSearch = useCallback(() => fetchPage({ reset: true }), [fetchPage])
@@ -77,17 +103,25 @@ export default function Education() {
   }, [topic, runSearch])
 
   useEffect(() => {
+    flagsRef.current = { hasMore, loading, loadingMore, error, nextToken }
+  }, [hasMore, loading, loadingMore, error, nextToken])
+
+  useEffect(() => {
     const el = sentinelRef.current
     if (!el) return
-    const io = new IntersectionObserver(entries => {
+    const onIntersect = (entries: IntersectionObserverEntry[]) => {
       const first = entries[0]
-      if (first?.isIntersecting && hasMore && !loading && !loadingMore && !error) {
-        fetchPage({ after: nextToken ?? null })
-      }
-    }, { rootMargin: '800px 0px 800px 0px' })
+      if (!first?.isIntersecting) return
+      const f = flagsRef.current
+      if (f.error) return
+      if (f.loading || f.loadingMore) return
+      if (!f.hasMore || !f.nextToken) return
+      fetchPage({ token: f.nextToken })
+    }
+    const io = new IntersectionObserver(onIntersect, { rootMargin: '900px 0px 900px 0px', threshold: 0 })
     io.observe(el)
     return () => io.disconnect()
-  }, [hasMore, loading, loadingMore, error, fetchPage, nextToken])
+  }, [fetchPage])
 
   return (
     <div className="max-w-6xl mx-auto px-3 pt-4 pb-10 md:px-4">
@@ -152,6 +186,7 @@ export default function Education() {
                 setNextToken(null)
                 setHasMore(false)
                 seenIdsRef.current.clear()
+                lastRequestedTokenRef.current = null
                 runSearch()
               }}
               className="px-4 py-2 rounded-xl border bg-white hover:bg-gray-50 font-semibold"
@@ -186,10 +221,22 @@ export default function Education() {
             <div className="col-span-full text-sm text-gray-600">No videos found.</div>
           )}
         </div>
-        <div ref={sentinelRef} className="h-12 flex items-center justify-center">
+
+        <div className="flex items-center justify-center mt-4">
           {loadingMore && <span className="text-sm text-gray-600">Loading more…</span>}
-          {!loadingMore && hasMore && <span className="text-sm text-gray-400">Scroll to load more…</span>}
         </div>
+
+        <div ref={sentinelRef} className="h-10" />
+        {hasMore && !loadingMore && !loading && (
+          <div className="mt-2 flex justify-center">
+            <button
+              onClick={() => fetchPage({ token: nextToken })}
+              className="px-4 py-2 rounded-xl border bg-white hover:bg-gray-50 font-semibold"
+            >
+              Load more
+            </button>
+          </div>
+        )}
       </section>
     </div>
   )
