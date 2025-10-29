@@ -78,7 +78,7 @@ export const handler: Handler = async (event) => {
       averages_by_topic: averages,
     }
 
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    const tipPrompt = [
       {
         role: 'system',
         content:
@@ -113,40 +113,17 @@ Rules:
       },
     ]
 
-    const PRIMARY_MODEL = process.env.OPENAI_MODEL || 'gpt-5.1-instant'
-    const FALLBACK_MODEL = process.env.OPENAI_FALLBACK_MODEL || 'gpt-4o-mini'
-
-    async function run(model: string) {
+    let tip = ''
+    try {
       const resp = await openai.chat.completions.create({
-        model,
-        messages,
+        model: 'gpt-4o-mini',
+        messages: tipPrompt as any,
         temperature: 0.6,
         max_tokens: 220,
       })
-      return resp.choices?.[0]?.message?.content?.trim() || ''
-    }
-
-    let tip = ''
-    try {
-      tip = await run(PRIMARY_MODEL)
-      if (!tip) throw new Error('empty_response')
-    } catch (err: any) {
-      console.error('smart-tip openai primary error', {
-        model: PRIMARY_MODEL,
-        status: err?.status,
-        code: err?.code,
-        message: err?.message,
-      })
-      try {
-        tip = await run(FALLBACK_MODEL)
-      } catch (err2: any) {
-        console.error('smart-tip openai fallback error', {
-          model: FALLBACK_MODEL,
-          status: err2?.status,
-          code: err2?.code,
-          message: err2?.message,
-        })
-      }
+      tip = resp.choices?.[0]?.message?.content?.trim() || ''
+    } catch {
+      tip = ''
     }
 
     if (!tip) {
@@ -155,7 +132,6 @@ Rules:
 
     return json(200, { tip })
   } catch (e: any) {
-    console.error('smart-tip fatal error', e)
     return json(500, { error: e?.message || 'Server error' })
   }
 }
