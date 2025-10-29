@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 
 type SearchItem = { id: string; title: string; thumbnail: string; url: string }
 
@@ -8,10 +8,16 @@ export default function Education() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<SearchItem[]>([])
+  const [searched, setSearched] = useState(false)
 
   const runSearch = async () => {
+    if (!query.trim()) {
+      setError('Please enter a search term.')
+      return
+    }
     setLoading(true)
     setError(null)
+    setSearched(true)
     try {
       const res = await fetch('/api/edu-search', {
         method: 'POST',
@@ -27,10 +33,6 @@ export default function Education() {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    runSearch()
-  }, [topic])
 
   return (
     <div className="max-w-6xl mx-auto px-3 pt-4 pb-10 md:px-4">
@@ -91,7 +93,7 @@ export default function Education() {
                 setQuery('')
                 setResults([])
                 setError(null)
-                runSearch()
+                setSearched(false)
               }}
               className="px-4 py-2 rounded-xl border bg-white hover:bg-gray-50 font-semibold"
             >
@@ -104,30 +106,32 @@ export default function Education() {
         {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
       </section>
 
-      <section>
-        <h2 className="text-lg md:text-2xl font-semibold text-gray-800 mb-4">
-          {query.trim() ? 'Search Results' : 'Recent Uploads'}
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
-          {results.map(v => (
-            <a
-              key={v.id}
-              href={v.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block group rounded-xl overflow-hidden shadow hover:shadow-lg transition"
-            >
-              <img src={v.thumbnail} alt={v.title} className="aspect-video w-full object-cover" />
-              <div className="p-2 text-xs md:text-sm font-medium text-gray-800 truncate group-hover:text-[var(--brand)]">
-                {v.title}
-              </div>
-            </a>
-          ))}
-          {!loading && !error && results.length === 0 && (
-            <div className="col-span-full text-sm text-gray-600">No videos found.</div>
-          )}
-        </div>
-      </section>
+      {searched && (
+        <section>
+          <h2 className="text-lg md:text-2xl font-semibold text-gray-800 mb-4">
+            Search Results
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
+            {results.map(v => (
+              <a
+                key={v.id}
+                href={v.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block group rounded-xl overflow-hidden shadow hover:shadow-lg transition"
+              >
+                <img src={v.thumbnail} alt={v.title} className="aspect-video w-full object-cover" />
+                <div className="p-2 text-xs md:text-sm font-medium text-gray-800 truncate group-hover:text-[var(--brand)]">
+                  {v.title}
+                </div>
+              </a>
+            ))}
+            {!loading && !error && results.length === 0 && (
+              <div className="col-span-full text-sm text-gray-600">No videos found.</div>
+            )}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
