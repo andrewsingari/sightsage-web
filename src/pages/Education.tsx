@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 type SearchItem = { id: string; title: string; thumbnail: string; url: string }
-type ApiResp = { items?: SearchItem[]; nextPageToken?: string; cursor?: string; error?: string }
+type ApiResp = { items?: SearchItem[]; nextPageToken?: string | null; error?: string }
 
 export default function Education() {
   const [query, setQuery] = useState('')
@@ -16,32 +16,14 @@ export default function Education() {
   const seenIdsRef = useRef<Set<string>>(new Set())
   const inFlightRef = useRef<AbortController | null>(null)
 
-  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const exactFilter = useCallback((items: SearchItem[], q: string) => {
-    const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
-    if (!terms.length) return items
-    return items.filter(it => {
-      const t = it.title.toLowerCase()
-      return terms.every(term => new RegExp(`\\b${esc(term)}\\b`, 'i').test(t))
-    })
-  }, [])
-
-  const mergeUnique = useCallback((incoming: SearchItem[]) => {
-    const out: SearchItem[] = []
-    for (const it of incoming) {
-      if (!it?.id) continue
-      if (seenIdsRef.current.has(it.id)) continue
-      seenIdsRef.current.add(it.id)
-      out.push(it)
-    }
-    return out
-  }, [])
+  const heading = useMemo(() => (query.trim() ? 'Search Results' : 'Recent Uploads'), [query])
 
   const fetchPage = useCallback(
     async (opts: { reset?: boolean; after?: string | null } = {}) => {
       if (inFlightRef.current) inFlightRef.current.abort()
       const ac = new AbortController()
       inFlightRef.current = ac
+
       const isReset = !!opts.reset
       if (isReset) {
         setResults([])
@@ -66,24 +48,26 @@ export default function Education() {
           setHasMore(false)
           return
         }
-        let items = Array.isArray(data.items) ? data.items : []
-        items = exactFilter(items, query)
-        const unique = mergeUnique(items)
+        const incoming = Array.isArray(data.items) ? data.items : []
+        const unique = incoming.filter(v => {
+          if (!v?.id) return false
+          if (seenIdsRef.current.has(v.id)) return false
+          seenIdsRef.current.add(v.id)
+          return true
+        })
         setResults(prev => (isReset ? unique : [...prev, ...unique]))
-        const token = (data.nextPageToken || data.cursor || null) as string | null
+        const token = data.nextPageToken || null
         setNextToken(token)
         setHasMore(!!token)
-      } catch (e) {
-        if ((e as any)?.name !== 'AbortError') {
-          setError('Unable to load results. Please try again.')
-        }
+      } catch (e: any) {
+        if (e?.name !== 'AbortError') setError('Unable to load results. Please try again.')
       } finally {
         if (isReset) setLoading(false)
         else setLoadingMore(false)
         if (inFlightRef.current === ac) inFlightRef.current = null
       }
     },
-    [topic, query, nextToken, exactFilter, mergeUnique]
+    [topic, query, nextToken]
   )
 
   const runSearch = useCallback(() => fetchPage({ reset: true }), [fetchPage])
@@ -104,8 +88,6 @@ export default function Education() {
     io.observe(el)
     return () => io.disconnect()
   }, [hasMore, loading, loadingMore, error, fetchPage, nextToken])
-
-  const heading = useMemo(() => (query.trim() ? 'Search Results' : 'Recent Uploads'), [query])
 
   return (
     <div className="max-w-6xl mx-auto px-3 pt-4 pb-10 md:px-4">
@@ -204,7 +186,6 @@ export default function Education() {
             <div className="col-span-full text-sm text-gray-600">No videos found.</div>
           )}
         </div>
-
         <div ref={sentinelRef} className="h-12 flex items-center justify-center">
           {loadingMore && <span className="text-sm text-gray-600">Loading more…</span>}
           {!loadingMore && hasMore && <span className="text-sm text-gray-400">Scroll to load more…</span>}
