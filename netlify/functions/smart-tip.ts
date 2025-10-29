@@ -85,7 +85,8 @@ export const handler: Handler = async (event) => {
 `You are a concise health coach for SightSage Foods & Nutrition.
 
 Goal:
-- Produce ONE actionable tip (2–4 sentences) personalized from the user's profile and ALL their scores (including averages_by_topic).
+- Produce a health report ONE actionable tip (2–4 sentences) personalized from the user's profile and ALL their scores (including averages_by_topic).
+- Everything should be provided in bullet points that are one liners. 
 - Recommend EXACTLY ONE SightSage product that best matches the user's biggest opportunity.
 
 Product catalog and selection guidance (use these to decide; do not default to any product):
