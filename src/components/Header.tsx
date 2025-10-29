@@ -48,43 +48,110 @@ export default function Header() {
 
   const closeMenu = () => setOpen(false)
 
+  const share = async () => {
+    const shareData = {
+      title: 'SightSage',
+      text: 'Check out SightSage Foods & Nutrition!',
+      url: 'https://sightsage.com',
+    }
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData)
+      } catch {}
+    } else {
+      const shareUrl = encodeURIComponent(shareData.url)
+      const text = encodeURIComponent(shareData.text)
+      const dialog = document.createElement('div')
+      dialog.className =
+        'fixed inset-0 bg-black/50 flex items-center justify-center z-50'
+      dialog.innerHTML = `
+        <div class="bg-white rounded-xl p-6 w-80 shadow-lg text-center">
+          <h3 class="text-lg font-semibold mb-3">Share SightSage</h3>
+          <div class="flex flex-col gap-2">
+            <a href="https://www.facebook.com/sharer/sharer.php?u=${shareUrl}" target="_blank" class="text-blue-600 hover:underline">Facebook</a>
+            <a href="https://api.whatsapp.com/send?text=${text}%20${shareUrl}" target="_blank" class="text-green-600 hover:underline">WhatsApp</a>
+            <a href="https://www.instagram.com/" target="_blank" class="text-pink-600 hover:underline">Instagram</a>
+            <a href="https://www.tiktok.com/" target="_blank" class="text-black hover:underline">TikTok</a>
+            <a href="https://www.messenger.com/t/" target="_blank" class="text-blue-500 hover:underline">Messenger</a>
+            <a href="https://web.wechat.com/" target="_blank" class="text-green-500 hover:underline">WeChat</a>
+          </div>
+          <button id="closeShareDialog" class="mt-4 px-4 py-2 rounded-lg border bg-gray-100 hover:bg-gray-200 font-semibold">Close</button>
+        </div>`
+      document.body.appendChild(dialog)
+      dialog.querySelector('#closeShareDialog')?.addEventListener('click', () => {
+        dialog.remove()
+      })
+    }
+  }
+
   return (
     <header className="w-full border-b bg-white">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-        <Link to="/" onClick={closeMenu} className="text-2xl sm:text-[28px] font-extrabold text-red-600 truncate">
+        <Link
+          to="/"
+          onClick={closeMenu}
+          className="text-2xl sm:text-[28px] font-extrabold text-red-600 truncate"
+        >
           SightSage
         </Link>
 
         <nav className="hidden md:flex items-center gap-2 sm:gap-4">
-          <Link to="/HealthReport" className="px-3 py-1.5 rounded-lg hover:bg-gray-100 font-semibold">
+          <Link
+            to="/HealthReport"
+            className="px-3 py-1.5 rounded-lg hover:bg-gray-100 font-semibold"
+          >
             Health Report
           </Link>
-          <Link to="/education" className="px-3 py-1.5 rounded-lg hover:bg-gray-100 font-semibold">
+          <Link
+            to="/education"
+            className="px-3 py-1.5 rounded-lg hover:bg-gray-100 font-semibold"
+          >
             Education
           </Link>
-          <a href="https://sightsage.com/en-ca/collections/shop-all" className="px-3 py-1.5 rounded-lg hover:bg-gray-100 font-semibold">
+          <a
+            href="https://sightsage.com/en-ca/collections/shop-all"
+            className="px-3 py-1.5 rounded-lg hover:bg-gray-100 font-semibold"
+          >
             Products
           </a>
+          <button
+            onClick={share}
+            className="px-3 py-1.5 rounded-lg hover:bg-gray-100 font-semibold"
+          >
+            Share
+          </button>
         </nav>
 
         <div className="hidden md:flex items-center gap-2">
           {authState === 'loading' ? null : authState === 'in' ? (
             isProfile ? (
-              <button onClick={signOut} className="px-4 py-1.5 rounded-lg hover:bg-gray-100 font-semibold">
+              <button
+                onClick={signOut}
+                className="px-4 py-1.5 rounded-lg hover:bg-gray-100 font-semibold"
+              >
                 Logout
               </button>
             ) : (
               <>
-                <Link to="/profile" className="px-4 py-1.5 rounded-lg border font-semibold hover:bg-gray-50">
+                <Link
+                  to="/profile"
+                  className="px-4 py-1.5 rounded-lg border font-semibold hover:bg-gray-50"
+                >
                   Profile
                 </Link>
-                <button onClick={signOut} className="px-4 py-1.5 rounded-lg hover:bg-gray-100 font-semibold">
+                <button
+                  onClick={signOut}
+                  className="px-4 py-1.5 rounded-lg hover:bg-gray-100 font-semibold"
+                >
                   Logout
                 </button>
               </>
             )
           ) : (
-            <Link to="/login" className="px-4 py-1.5 rounded-lg hover:bg-gray-100 font-semibold">
+            <Link
+              to="/login"
+              className="px-4 py-1.5 rounded-lg hover:bg-gray-100 font-semibold"
+            >
               Login
             </Link>
           )}
@@ -96,8 +163,18 @@ export default function Header() {
           aria-label="Menu"
           onClick={() => setOpen(v => !v)}
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path d="M4 6h16M4 12h16M4 18h16" strokeWidth="2" strokeLinecap="round" />
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+          >
+            <path
+              d="M4 6h16M4 12h16M4 18h16"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
           </svg>
         </button>
       </div>
@@ -105,32 +182,67 @@ export default function Header() {
       {open && (
         <div className="md:hidden border-t bg-white">
           <div className="max-w-6xl mx-auto px-4 py-2 flex flex-col gap-1">
-            <Link to="/HealthReport" onClick={closeMenu} className="px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold">
+            <Link
+              to="/HealthReport"
+              onClick={closeMenu}
+              className="px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold"
+            >
               Health Report
             </Link>
-            <Link to="/education" onClick={closeMenu} className="px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold">
+            <Link
+              to="/education"
+              onClick={closeMenu}
+              className="px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold"
+            >
               Education
             </Link>
-            <a href="https://sightsage.com/en-ca/collections/shop-all" onClick={closeMenu} className="px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold">
+            <a
+              href="https://sightsage.com/en-ca/collections/shop-all"
+              onClick={closeMenu}
+              className="px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold"
+            >
               Products
             </a>
+            <button
+              onClick={() => {
+                closeMenu()
+                share()
+              }}
+              className="px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold text-left"
+            >
+              Share
+            </button>
             {authState === 'loading' ? null : authState === 'in' ? (
               isProfile ? (
-                <button onClick={signOut} className="mt-1 px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold text-left">
+                <button
+                  onClick={signOut}
+                  className="mt-1 px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold text-left"
+                >
                   Logout
                 </button>
               ) : (
                 <>
-                  <Link to="/profile" onClick={closeMenu} className="px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold">
+                  <Link
+                    to="/profile"
+                    onClick={closeMenu}
+                    className="px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold"
+                  >
                     Profile
                   </Link>
-                  <button onClick={signOut} className="mt-1 px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold text-left">
+                  <button
+                    onClick={signOut}
+                    className="mt-1 px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold text-left"
+                  >
                     Logout
                   </button>
                 </>
               )
             ) : (
-              <Link to="/login" onClick={closeMenu} className="mt-1 px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold">
+              <Link
+                to="/login"
+                onClick={closeMenu}
+                className="mt-1 px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold"
+              >
                 Login
               </Link>
             )}
