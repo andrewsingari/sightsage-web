@@ -16,8 +16,7 @@ export default function Education() {
   const sentinelRef = useRef<HTMLDivElement | null>(null)
   const seenIdsRef = useRef<Set<string>>(new Set())
   const inFlightRef = useRef<AbortController | null>(null)
-  const flagsRef = useRef({ hasMore: false, loading: false, loadingMore: false, error: null as string | null, nextToken: null as string | null })
-  const lastRequestedTokenRef = useRef<string | null>(null)
+  const activeKeyRef = useRef<string>('')
 
   const heading = useMemo(() => (query.trim() ? 'Search Results' : 'Recent Uploads'), [query])
 
@@ -25,13 +24,17 @@ export default function Education() {
   const titleMatches = useCallback((title: string, q: string) => {
     const t = (q || '').trim()
     if (!t) return true
-    return new RegExp(`\\b${esc(t)}\\b`, 'i').test(title)
+    const words = t.split(/\s+/).filter(Boolean)
+    if (words.length === 0) return true
+    const pattern = words.map(w => `\\b${esc(w)}\\b`).join('(?=.*)')
+    return new RegExp(`^(?=.*${pattern}).*`, 'i').test(title)
   }, [])
 
   const fetchPage = useCallback(
     async (opts: { reset?: boolean; token?: string | null } = {}) => {
       const isReset = !!opts.reset
       const token = opts.token ?? (isReset ? null : nextToken)
+      const requestKey = `${topic}::${query.trim()}::${isReset ? 'reset' : token || 'first'}`
 
       if (isReset) {
         if (inFlightRef.current) inFlightRef.current.abort()
@@ -41,14 +44,11 @@ export default function Education() {
         setHasMore(false)
         setError(null)
         seenIdsRef.current.clear()
-        lastRequestedTokenRef.current = null
       } else {
-        if (loadingMore) return
-        if (!token) return
-        if (lastRequestedTokenRef.current === token) return
-        lastRequestedTokenRef.current = token
+        if (loadingMore || !token) return
       }
 
+      activeKeyRef.current = requestKey
       const ac = new AbortController()
       if (isReset) inFlightRef.current = ac
 
@@ -63,6 +63,7 @@ export default function Education() {
           signal: ac.signal,
         })
         const data: ApiResp = await res.json().catch(() => ({} as any))
+        if (activeKeyRef.current !== requestKey) return
         if (!res.ok) {
           setError(data?.error || 'Failed to load videos')
           setHasMore(false)
@@ -81,7 +82,6 @@ export default function Education() {
         const newToken = data.nextPageToken || null
         setNextToken(newToken)
         setHasMore(!!newToken)
-        if (isReset) lastRequestedTokenRef.current = null
       } catch (e: any) {
         if (e?.name !== 'AbortError') setError('Unable to load results. Please try again.')
       } finally {
@@ -103,25 +103,20 @@ export default function Education() {
   }, [topic, runSearch])
 
   useEffect(() => {
-    flagsRef.current = { hasMore, loading, loadingMore, error, nextToken }
-  }, [hasMore, loading, loadingMore, error, nextToken])
-
-  useEffect(() => {
     const el = sentinelRef.current
     if (!el) return
-    const onIntersect = (entries: IntersectionObserverEntry[]) => {
-      const first = entries[0]
-      if (!first?.isIntersecting) return
-      const f = flagsRef.current
-      if (f.error) return
-      if (f.loading || f.loadingMore) return
-      if (!f.hasMore || !f.nextToken) return
-      fetchPage({ token: f.nextToken })
-    }
-    const io = new IntersectionObserver(onIntersect, { rootMargin: '900px 0px 900px 0px', threshold: 0 })
+    const io = new IntersectionObserver(
+      entries => {
+        const first = entries[0]
+        if (!first?.isIntersecting) return
+        if (error || loading || loadingMore || !hasMore || !nextToken) return
+        fetchPage({ token: nextToken })
+      },
+      { rootMargin: '800px 0px 800px 0px', threshold: 0 }
+    )
     io.observe(el)
     return () => io.disconnect()
-  }, [fetchPage])
+  }, [error, loading, loadingMore, hasMore, nextToken, fetchPage])
 
   return (
     <div className="max-w-6xl mx-auto px-3 pt-4 pb-10 md:px-4">
@@ -186,7 +181,6 @@ export default function Education() {
                 setNextToken(null)
                 setHasMore(false)
                 seenIdsRef.current.clear()
-                lastRequestedTokenRef.current = null
                 runSearch()
               }}
               className="px-4 py-2 rounded-xl border bg-white hover:bg-gray-50 font-semibold"
@@ -227,6 +221,7 @@ export default function Education() {
         </div>
 
         <div ref={sentinelRef} className="h-10" />
+
         {hasMore && !loadingMore && !loading && (
           <div className="mt-2 flex justify-center">
             <button
