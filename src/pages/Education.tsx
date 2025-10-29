@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 type SearchItem = { id: string; title: string; thumbnail: string; url: string }
 
@@ -19,7 +19,7 @@ export default function Education() {
         body: JSON.stringify({ topic, query }),
       })
       const data = await res.json()
-      if (res.ok && data.items) setResults(data.items)
+      if (res.ok && Array.isArray(data.items)) setResults(data.items)
       else setError(data.error || 'Failed to load videos')
     } catch {
       setError('Unable to load results. Please try again.')
@@ -27,6 +27,11 @@ export default function Education() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    runSearch()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topic])
 
   return (
     <div className="max-w-6xl mx-auto px-3 pt-4 pb-10 md:px-4">
@@ -76,9 +81,10 @@ export default function Education() {
           <div className="flex gap-2">
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-[var(--brand)] text-white font-semibold hover:opacity-90"
+              disabled={loading}
+              className={`px-4 py-2 rounded-xl text-white font-semibold ${loading ? 'bg-gray-400' : 'bg-[var(--brand)] hover:opacity-90'}`}
             >
-              Search
+              {loading ? 'Searching…' : 'Search'}
             </button>
             <button
               type="button"
@@ -86,6 +92,7 @@ export default function Education() {
                 setQuery('')
                 setResults([])
                 setError(null)
+                runSearch()
               }}
               className="px-4 py-2 rounded-xl border bg-white hover:bg-gray-50 font-semibold"
             >
@@ -100,12 +107,12 @@ export default function Education() {
 
       <section>
         <h2 className="text-lg md:text-2xl font-semibold text-gray-800 mb-4">
-          {results.length ? 'Search Results' : 'Recent Uploads'}
+          {query.trim() ? 'Search Results' : 'Recent Uploads'}
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
-          {results.map((v, i) => (
+          {results.map(v => (
             <a
-              key={i}
+              key={v.id}
               href={v.url}
               target="_blank"
               rel="noopener noreferrer"
@@ -117,6 +124,9 @@ export default function Education() {
               </div>
             </a>
           ))}
+          {!loading && !error && results.length === 0 && (
+            <div className="col-span-full text-sm text-gray-600">No videos found.</div>
+          )}
         </div>
       </section>
     </div>
