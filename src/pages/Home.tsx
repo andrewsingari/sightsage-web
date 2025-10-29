@@ -343,7 +343,7 @@ export default function Home() {
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M9 18h6M12 2a7 7 0 0 1 7 7c0 2.5-1.3 4.2-2.7 5.4-.6.5-1.1 1.2-1.3 2H9c-.2-.8-.7-1.5-1.3-2C6.3 13.2 5 11.5 5 9a7 7 0 0 1 7-7Z" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <span>Smart Tip</span>
+              <span>SightSage Wellness Plan</span>
             </button>
 
             {calOpen && (
