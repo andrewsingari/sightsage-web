@@ -618,8 +618,9 @@ export default function Home() {
       {tipOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50">
           <div className="bg-white w-[min(92vw,560px)] rounded-2xl p-5 sm:p-6 shadow-xl">
-            <div className="text-lg sm:text-xl font-bold mb-2">Smart Tip</div>
-            <div className="min-h-[80px] text-gray-800">
+            <div className="text-lg sm:text-xl font-bold mb-2">
+              SightSage Wellness Plan for {displayName || 'you'}
+            </div>            <div className="min-h-[80px] text-gray-800">
               {tipLoading ? 'Fetching your tip…' : tipError ? <span className="text-red-600">{tipError}</span> : renderedTip}
             </div>
             <div className="mt-4 flex items-center justify-between gap-2">
