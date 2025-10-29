@@ -13,7 +13,7 @@ export default function Education() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/.netlify/functions/youtube-search', {
+      const res = await fetch('/api/edu-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic, query }),
@@ -30,7 +30,6 @@ export default function Education() {
 
   useEffect(() => {
     runSearch()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topic])
 
   return (
