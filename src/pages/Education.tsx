@@ -1,36 +1,111 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 type SearchItem = { id: string; title: string; thumbnail: string; url: string }
+type ApiResp = { items?: SearchItem[]; nextPageToken?: string; cursor?: string; error?: string }
 
 export default function Education() {
   const [query, setQuery] = useState('')
   const [topic, setTopic] = useState<'vision' | 'other'>('vision')
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<SearchItem[]>([])
+  const [nextToken, setNextToken] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const seenIdsRef = useRef<Set<string>>(new Set())
+  const inFlightRef = useRef<AbortController | null>(null)
 
-  const runSearch = async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/edu-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, query }),
-      })
-      const data = await res.json()
-      if (res.ok && Array.isArray(data.items)) setResults(data.items)
-      else setError(data.error || 'Failed to load videos')
-    } catch {
-      setError('Unable to load results. Please try again.')
-    } finally {
-      setLoading(false)
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const exactFilter = useCallback((items: SearchItem[], q: string) => {
+    const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    if (!terms.length) return items
+    return items.filter(it => {
+      const t = it.title.toLowerCase()
+      return terms.every(term => new RegExp(`\\b${esc(term)}\\b`, 'i').test(t))
+    })
+  }, [])
+
+  const mergeUnique = useCallback((incoming: SearchItem[]) => {
+    const out: SearchItem[] = []
+    for (const it of incoming) {
+      if (!it?.id) continue
+      if (seenIdsRef.current.has(it.id)) continue
+      seenIdsRef.current.add(it.id)
+      out.push(it)
     }
-  }
+    return out
+  }, [])
+
+  const fetchPage = useCallback(
+    async (opts: { reset?: boolean; after?: string | null } = {}) => {
+      if (inFlightRef.current) inFlightRef.current.abort()
+      const ac = new AbortController()
+      inFlightRef.current = ac
+      const isReset = !!opts.reset
+      if (isReset) {
+        setResults([])
+        setNextToken(null)
+        setHasMore(false)
+        seenIdsRef.current.clear()
+      }
+      setError(null)
+      if (isReset) setLoading(true)
+      else setLoadingMore(true)
+      try {
+        const body: Record<string, any> = { topic, query, pageToken: opts.after ?? nextToken ?? null }
+        const res = await fetch('/api/edu-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: ac.signal,
+        })
+        const data: ApiResp = await res.json().catch(() => ({} as any))
+        if (!res.ok) {
+          setError(data?.error || 'Failed to load videos')
+          setHasMore(false)
+          return
+        }
+        let items = Array.isArray(data.items) ? data.items : []
+        items = exactFilter(items, query)
+        const unique = mergeUnique(items)
+        setResults(prev => (isReset ? unique : [...prev, ...unique]))
+        const token = (data.nextPageToken || data.cursor || null) as string | null
+        setNextToken(token)
+        setHasMore(!!token)
+      } catch (e) {
+        if ((e as any)?.name !== 'AbortError') {
+          setError('Unable to load results. Please try again.')
+        }
+      } finally {
+        if (isReset) setLoading(false)
+        else setLoadingMore(false)
+        if (inFlightRef.current === ac) inFlightRef.current = null
+      }
+    },
+    [topic, query, nextToken, exactFilter, mergeUnique]
+  )
+
+  const runSearch = useCallback(() => fetchPage({ reset: true }), [fetchPage])
 
   useEffect(() => {
     runSearch()
-  }, [topic])
+  }, [topic, runSearch])
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(entries => {
+      const first = entries[0]
+      if (first?.isIntersecting && hasMore && !loading && !loadingMore && !error) {
+        fetchPage({ after: nextToken ?? null })
+      }
+    }, { rootMargin: '800px 0px 800px 0px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, loading, loadingMore, error, fetchPage, nextToken])
+
+  const heading = useMemo(() => (query.trim() ? 'Search Results' : 'Recent Uploads'), [query])
 
   return (
     <div className="max-w-6xl mx-auto px-3 pt-4 pb-10 md:px-4">
@@ -75,6 +150,7 @@ export default function Education() {
               placeholder={topic === 'vision' ? 'Search vision topics…' : 'Search health topics…'}
               className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm md:text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
             />
+            <div className="mt-1 text-xs text-gray-500">Search matches exact words in video titles</div>
           </div>
 
           <div className="flex gap-2">
@@ -91,6 +167,9 @@ export default function Education() {
                 setQuery('')
                 setResults([])
                 setError(null)
+                setNextToken(null)
+                setHasMore(false)
+                seenIdsRef.current.clear()
                 runSearch()
               }}
               className="px-4 py-2 rounded-xl border bg-white hover:bg-gray-50 font-semibold"
@@ -105,9 +184,7 @@ export default function Education() {
       </section>
 
       <section>
-        <h2 className="text-lg md:text-2xl font-semibold text-gray-800 mb-4">
-          {query.trim() ? 'Search Results' : 'Recent Uploads'}
-        </h2>
+        <h2 className="text-lg md:text-2xl font-semibold text-gray-800 mb-4">{heading}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
           {results.map(v => (
             <a
@@ -126,6 +203,11 @@ export default function Education() {
           {!loading && !error && results.length === 0 && (
             <div className="col-span-full text-sm text-gray-600">No videos found.</div>
           )}
+        </div>
+
+        <div ref={sentinelRef} className="h-12 flex items-center justify-center">
+          {loadingMore && <span className="text-sm text-gray-600">Loading more…</span>}
+          {!loadingMore && hasMore && <span className="text-sm text-gray-400">Scroll to load more…</span>}
         </div>
       </section>
     </div>
