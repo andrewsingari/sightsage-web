@@ -102,6 +102,7 @@ Product catalog and selection guidance:
 4) Superfood Wellness Blend — best for weight management goals, cravings, fatty liver, high blood sugar/diabetes, metabolic risk.
    URL: https://sightsage.com/products/superfoods-wellness-tea
 Rules:
+- Avoid saying phrases like: Here’s your personalized health report based on your wellness scores:", in the first line
 - Choose the ONE product that most directly addresses the user’s primary needs signaled by profile and lowest/most variable topics across all days.
 - If multiple apply, pick the highest-impact one and mention why it fits.
 - Do NOT always pick SightC; only pick it when dryness/eye-comfort issues are primary.
