@@ -2,10 +2,10 @@
 
 A wellness tracking web app that turns daily self-reported health data into clear, actionable guidance. The app generates a personalized **Wellness Plan** using the **OpenAI (ChatGPT) API** and surfaces relevant educational content using the **YouTube Data API**.
 
-## Access / Demo
-This app is currently hosted in an internal environment:
+## Live Demo
+Public demo (anyone can register):
 
-- Internal URL: [https://sightsage.com/app](https://sightsage.com/app)
+URL: [https://sightsage.com/app](https://sightsage.com/app)
 
 If you don’t have access to the internal environment, the screenshots below show the key flows.
 
