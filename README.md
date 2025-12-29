@@ -5,7 +5,7 @@ A wellness tracking web app that turns daily self-reported health data into clea
 ## Access / Demo
 This app is currently hosted in an internal environment:
 
-- `https://sightsage.com/app`
+- Internal URL: [https://sightsage.com/app](https://sightsage.com/app)
 
 If you don’t have access to the internal environment, the screenshots below show the key flows.
 
