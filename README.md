@@ -11,11 +11,19 @@ If you don’t have access to the internal environment, the screenshots below sh
 
 ## Screenshots
 
-![Home Dashboard](docs/screenshots/home.png)
-![Calendar](docs/screenshots/calendar.png)
-![Vision Test](docs/screenshots/eye-test.png)
-![Questionnaire](docs/screenshots/questionnaire.png)
-![Wellness Plan](docs/screenshots/wellness-plan.png)
+<img src="docs/screenshots/home.png" width="700" alt="Home Dashboard" />
+<br/>
+
+<img src="docs/screenshots/calendar.png" width="700" alt="Calendar" />
+<br/>
+
+<img src="docs/screenshots/eye-test.png" width="700" alt="Vision Test" />
+<br/>
+
+<img src="docs/screenshots/questionnaire.png" width="700" alt="Questionnaire" />
+<br/>
+
+<img src="docs/screenshots/wellness-plan.png" width="700" alt="Wellness Plan" />
 
 ## What it does
 - Tracks daily wellness inputs and scores across health topics using questionnaires.
