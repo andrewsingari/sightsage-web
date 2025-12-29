@@ -1,4 +1,4 @@
-# SightSage Wellness App
+# SightSage Health Management
 
 A wellness tracking web app that turns daily self-reported health data into clear, actionable guidance. The app generates a personalized **Wellness Plan** using the **OpenAI (ChatGPT) API** and surfaces relevant educational content using the **YouTube Data API**.
 
